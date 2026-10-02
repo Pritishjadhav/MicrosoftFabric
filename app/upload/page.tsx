@@ -1,5 +1,5 @@
 import { FileUploader } from '@/components/FileUploader';
-import { isFabricConfigured } from '@/lib/auth';
+import { isFabricConfigured } from '@/lib/fabric';
 import { FabricNotConfigured } from '@/components/ErrorState';
 import { SUPPORTED_TYPES_DISPLAY, MAX_FILE_SIZE_BYTES } from '@/lib/validation';
 import { Info } from 'lucide-react';

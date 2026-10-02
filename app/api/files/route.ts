@@ -1,39 +1,10 @@
-/**
- * GET /api/files
- *
- * Returns a paginated, filterable list of files accessible to the authenticated user.
- *
- * Query Parameters:
- *   search    - Text search across filename
- *   fileType  - Filter by type: pdf | csv | excel | json | text | image | zip | all
- *   sortBy    - Sort field: name | size | uploadedAt (default: uploadedAt)
- *   sortOrder - Sort direction: asc | desc (default: desc)
- *   page      - Page number (default: 1)
- *   pageSize  - Items per page (default: 20, max: 100)
- *
- * SECURITY:
- *   - Requires authenticated session
- *   - Returns only public metadata fields
- *   - No storage paths exposed if unnecessary
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isFabricConfigured } from '@/lib/auth';
-import { listFileMetadata } from '@/lib/metadata';
-import { metadataToUploadedFile } from '@/lib/onelake';
+import { isFabricConfigured } from '@/lib/fabric';
+import { listFilesInOneLake } from '@/lib/onelake';
 import { createApiError, createApiSuccess, toUserFriendlyError } from '@/lib/utils';
 import type { FileFilters, FileType } from '@/types/file';
 
 export async function GET(request: NextRequest) {
-  // ── Authenticate ──────────────────────────────────────────────────────────
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json(createApiError('UNAUTHORIZED', 'You must be signed in to view files.'), {
-      status: 401,
-    });
-  }
-
   // ── Check Fabric Configuration ────────────────────────────────────────────
   if (!isFabricConfigured()) {
     // Return empty list rather than error so the UI can show setup instructions
@@ -66,16 +37,44 @@ export async function GET(request: NextRequest) {
     pageSize,
   };
 
-  // ── Fetch Metadata ────────────────────────────────────────────────────────
+  // ── Fetch Files from OneLake ──────────────────────────────────────────────
   try {
-    const { files: metadataRecords, total } = await listFileMetadata(filters);
+    let files = await listFilesInOneLake('Files/uploads');
 
-    const files = metadataRecords.map(metadataToUploadedFile);
+    // ── Client-side filtering and sorting ───────────────────────────────────
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      files = files.filter((f) => f.originalName.toLowerCase().includes(q));
+    }
+
+    if (filters.fileType && filters.fileType !== 'all') {
+      files = files.filter((f) => f.fileType === filters.fileType);
+    }
+
+    files.sort((a, b) => {
+      let comparison = 0;
+      switch (filters.sortBy) {
+        case 'name':
+          comparison = a.originalName.localeCompare(b.originalName);
+          break;
+        case 'size':
+          comparison = a.size - b.size;
+          break;
+        case 'uploadedAt':
+        default:
+          comparison = new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime();
+          break;
+      }
+      return filters.sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    const total = files.length;
     const totalPages = Math.ceil(total / pageSize);
+    const paginatedFiles = files.slice((page - 1) * pageSize, page * pageSize);
 
     return NextResponse.json(
       createApiSuccess({
-        files,
+        files: paginatedFiles,
         total,
         page,
         pageSize,

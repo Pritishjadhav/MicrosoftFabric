@@ -19,7 +19,6 @@
  */
 
 import { onelakeRequest, FabricApiError } from './fabric';
-import type { FileMetadata } from '@/types/file';
 import type { UploadedFile } from '@/types/file';
 import { getMimeFileType } from '@/types/file';
 
@@ -232,21 +231,63 @@ export function sanitizeFilename(filename: string): string {
 }
 
 /**
- * Converts a FileMetadata database record to a client-facing UploadedFile shape.
+ * Lists files in a specific OneLake directory using the ADLS Gen2 API.
+ *
+ * @param directory - The directory path, e.g., "Files/uploads"
  */
-export function metadataToUploadedFile(metadata: FileMetadata): UploadedFile {
-  return {
-    id: metadata.id,
-    name: metadata.file_name,
-    originalName: metadata.original_file_name,
-    size: metadata.file_size,
-    type: metadata.file_type,
-    fileType: getMimeFileType(metadata.file_type),
-    path: metadata.storage_path,
-    uploadedBy: metadata.uploaded_by,
-    uploadedByEmail: metadata.uploaded_by_email,
-    uploadedAt: metadata.uploaded_at,
-    status: metadata.status,
-    checksum: metadata.checksum,
-  };
+export async function listFilesInOneLake(directory: string = 'Files/uploads'): Promise<UploadedFile[]> {
+  // Query the ADLS Gen2 endpoint to list paths
+  // Using lakehouseId as the "filesystem" equivalent
+  const response = await onelakeRequest(
+    `?resource=filesystem&recursive=true&directory=${directory}`,
+    { method: 'GET' }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      // Directory doesn't exist yet, return empty array
+      return [];
+    }
+    const body = await response.text().catch(() => '');
+    throw new FabricApiError(
+      `OneLake: Failed to list files in "${directory}". Status: ${response.status}. ${body}`,
+      response.status
+    );
+  }
+
+  const data = await response.json();
+  const paths: { name: string; isDirectory: boolean; contentLength: string; lastModified: string }[] = data.paths || [];
+
+  return paths
+    .filter((p) => !p.isDirectory)
+    .map((p) => {
+      // Extract original filename from UUID-filename pattern if possible
+      const basename = p.name.split('/').pop() || '';
+      let originalName = basename;
+      let id = basename;
+      const match = basename.match(/^([a-f0-9-]+)-(.*)$/);
+      if (match) {
+        id = match[1];
+        originalName = match[2];
+      }
+
+      // Ensure proper typing for length
+      const size = parseInt(p.contentLength || '0', 10);
+      
+      return {
+        id,
+        name: basename,
+        originalName,
+        size,
+        type: 'application/octet-stream', // Can't easily infer MIME from just list response, could use extension map
+        fileType: getMimeFileType('application/octet-stream'),
+        path: p.name.replace(/^Files\//, ''), // Strip "Files/" prefix for consistency with upload routes
+        uploadedBy: 'Unknown',
+        uploadedByEmail: '',
+        uploadedAt: new Date(p.lastModified).toISOString(),
+        status: 'uploaded' as const,
+        checksum: null,
+      };
+    })
+    .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
 }

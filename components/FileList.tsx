@@ -121,7 +121,8 @@ export function FileList() {
     setIsDeleting(true);
 
     try {
-      const res = await fetch(`/api/files/${deleteTarget.id}`, { method: 'DELETE' });
+      const params = new URLSearchParams({ path: deleteTarget.path });
+      const res = await fetch(`/api/file?${params.toString()}`, { method: 'DELETE' });
       const data = await res.json();
 
       if (!res.ok || !data.success) {
@@ -143,7 +144,8 @@ export function FileList() {
     toast.info(`Preparing download for "${file.originalName}"...`);
 
     try {
-      const res = await fetch(`/api/files/${file.id}`);
+      const params = new URLSearchParams({ path: file.path });
+      const res = await fetch(`/api/file?${params.toString()}`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error?.message ?? 'Download failed.');

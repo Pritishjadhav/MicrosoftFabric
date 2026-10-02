@@ -1,6 +1,5 @@
-import { getServerSession } from 'next-auth';
-import { authOptions, isFabricConfigured } from '@/lib/auth';
-import { CheckCircle2, XCircle, Settings, ExternalLink } from 'lucide-react';
+import { isFabricConfigured } from '@/lib/fabric';
+import { CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -39,16 +38,10 @@ function ConfigItem({ label, configured, description }: ConfigItemProps) {
 }
 
 export default async function SettingsPage() {
-  const session = await getServerSession(authOptions);
-
   const configStatus = {
     auth: !!(process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET),
     fabric: isFabricConfigured(),
-    nextauth: !!process.env.NEXTAUTH_SECRET,
   };
-
-  const userName = session?.user?.name ?? 'Unknown';
-  const userEmail = session?.user?.email ?? 'Unknown';
 
   return (
     <div className="space-y-6 fade-in max-w-2xl">
@@ -59,24 +52,6 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      {/* User profile */}
-      <div className="card p-6">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4 flex items-center gap-2">
-          <Settings size={15} />
-          Signed-in User
-        </h2>
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
-            {userName[0]?.toUpperCase()}
-          </div>
-          <div>
-            <p className="font-semibold text-slate-800">{userName}</p>
-            <p className="text-sm text-slate-500">{userEmail}</p>
-            <span className="badge badge-success text-xs mt-1">Authenticated</span>
-          </div>
-        </div>
-      </div>
-
       {/* Configuration status */}
       <div className="card p-6">
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
@@ -84,14 +59,9 @@ export default async function SettingsPage() {
         </h2>
 
         <ConfigItem
-          label="Microsoft Entra ID"
+          label="Azure Service Principal"
           configured={configStatus.auth}
           description="AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET"
-        />
-        <ConfigItem
-          label="NextAuth Secret"
-          configured={configStatus.nextauth}
-          description="NEXTAUTH_SECRET is required for session security"
         />
         <ConfigItem
           label="Microsoft Fabric Workspace"
@@ -122,11 +92,6 @@ export default async function SettingsPage() {
               url: 'https://learn.microsoft.com/en-us/fabric/onelake/onelake-api',
               desc: 'ADLS Gen2-compatible DFS REST API for OneLake',
             },
-            {
-              title: 'Microsoft Entra ID App Registration',
-              url: 'https://entra.microsoft.com/',
-              desc: 'Manage your Azure Active Directory app registration',
-            },
           ].map(({ title, url, desc }) => (
             <a
               key={url}
@@ -149,7 +114,7 @@ export default async function SettingsPage() {
 
       {/* Version info */}
       <div className="text-xs text-slate-400 text-center py-2">
-        Fabric File Manager · Built with Next.js, NextAuth.js, and Microsoft Fabric
+        Fabric File Manager · Built with Next.js and Microsoft Fabric
       </div>
     </div>
   );

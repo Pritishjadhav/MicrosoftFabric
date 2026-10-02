@@ -247,3 +247,16 @@ export function getFabricConfig() {
     onelakeBase: ONELAKE_DFS_BASE,
   };
 }
+
+/**
+ * Checks if all required Fabric environment variables are set
+ */
+export function isFabricConfigured(): boolean {
+  return !!(
+    process.env.AZURE_TENANT_ID &&
+    process.env.AZURE_CLIENT_ID &&
+    process.env.AZURE_CLIENT_SECRET &&
+    process.env.FABRIC_WORKSPACE_ID &&
+    process.env.FABRIC_LAKEHOUSE_ID
+  );
+}
