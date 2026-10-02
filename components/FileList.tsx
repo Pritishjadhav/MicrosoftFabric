@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, startTransition } from 'react';
 import { Download, Trash2, Search, RefreshCw, ChevronUp, ChevronDown, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { FileIconBadge } from './FileIcon';
@@ -10,7 +10,7 @@ import { ErrorState } from './ErrorState';
 import { TableSkeleton } from './LoadingState';
 import { formatFileSize, getMimeFileType } from '@/types/file';
 import { timeAgo } from '@/lib/utils';
-import type { UploadedFile, FileType, FileFilters } from '@/types/file';
+import type { UploadedFile, FileType } from '@/types/file';
 
 type SortField = 'name' | 'size' | 'uploadedAt';
 type SortOrder = 'asc' | 'desc';
@@ -25,6 +25,23 @@ const FILE_TYPE_OPTIONS: { value: FileType | 'all'; label: string }[] = [
   { value: 'image', label: 'Image' },
   { value: 'zip', label: 'ZIP' },
 ];
+
+function SortIcon({
+  field,
+  sortBy,
+  sortOrder,
+}: {
+  field: SortField;
+  sortBy: SortField;
+  sortOrder: SortOrder;
+}) {
+  if (sortBy !== field) return null;
+  return sortOrder === 'asc' ? (
+    <ChevronUp size={14} className="text-blue-500 inline ml-1" />
+  ) : (
+    <ChevronDown size={14} className="text-blue-500 inline ml-1" />
+  );
+}
 
 export function FileList() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -48,7 +65,7 @@ export function FileList() {
   // Download tracking
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const fetchFiles = useCallback(async () => {
+  const doFetchFiles = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -80,9 +97,14 @@ export function FileList() {
     }
   }, [search, fileType, sortBy, sortOrder, page]);
 
+  // Stable fetchFiles ref for consumers
+  const fetchFiles = doFetchFiles;
+
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    startTransition(() => {
+      void doFetchFiles();
+    });
+  }, [doFetchFiles]);
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -145,14 +167,6 @@ export function FileList() {
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortBy !== field) return null;
-    return sortOrder === 'asc' ? (
-      <ChevronUp size={14} className="text-blue-500 inline ml-1" />
-    ) : (
-      <ChevronDown size={14} className="text-blue-500 inline ml-1" />
-    );
-  };
 
   // Show skeleton
   if (isLoading) return <TableSkeleton rows={6} />;
@@ -236,21 +250,21 @@ export function FileList() {
               className="text-left hover:text-slate-700 transition-colors"
               aria-label="Sort by file name"
             >
-              File <SortIcon field="name" />
+              File <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} />
             </button>
             <button
               onClick={() => handleSort('size')}
               className="text-left hover:text-slate-700 transition-colors"
               aria-label="Sort by file size"
             >
-              Size <SortIcon field="size" />
+              Size <SortIcon field="size" sortBy={sortBy} sortOrder={sortOrder} />
             </button>
             <button
               onClick={() => handleSort('uploadedAt')}
               className="text-left hover:text-slate-700 transition-colors"
               aria-label="Sort by upload date"
             >
-              Uploaded <SortIcon field="uploadedAt" />
+              Uploaded <SortIcon field="uploadedAt" sortBy={sortBy} sortOrder={sortOrder} />
             </button>
             <span>Status</span>
             <span>Actions</span>

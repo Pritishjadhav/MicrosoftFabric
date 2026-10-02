@@ -42,7 +42,7 @@ async function executeSql(query: string, queryParams: unknown[] = []): Promise<u
 
   // Use Fabric Lakehouse SQL Analytics Endpoint via the executeQueries API
   // This submits a query to the Lakehouse SQL analytics endpoint
-  const endpoint = `/workspaces/${config.workspaceId}/lakehouses/${config.lakehouseId}/lakehouses`;
+  // Pattern: /workspaces/{workspaceId}/items/{lakehouseId}/executeQueries
 
   // For metadata operations, we leverage the Fabric REST API
   // The actual SQL execution is done via the Fabric Data Warehouse endpoint
